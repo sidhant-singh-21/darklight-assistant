@@ -87,7 +87,11 @@ const Index = () => {
               message.sender === 'user' ? 'ml-auto bg-primary/10' : ''
             } max-w-[80%]`}
           >
-            <p className="text-sm">{message.content}</p>
+            {message.content.startsWith('<img') ? (
+              <div dangerouslySetInnerHTML={{ __html: message.content }} />
+            ) : (
+              <p className="text-sm">{message.content}</p>
+            )}
             <p className="text-xs text-muted-foreground mt-2">
               {new Date(message.timestamp).toLocaleTimeString()}
             </p>

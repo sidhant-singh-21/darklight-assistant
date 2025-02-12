@@ -1,4 +1,3 @@
-
 import { Mic, Camera, User, MessageSquare, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -48,31 +47,122 @@ export function AppSidebar() {
     navigate(0);
   };
 
-  const handleVoiceInput = () => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      toast({
-        title: "Voice Input",
-        description: "Speech recognition is available but not yet implemented. Coming soon!",
-      });
-    } else {
+  const handleVoiceInput = async () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       toast({
         title: "Voice Input Unavailable",
         description: "Your browser doesn't support voice input. Please try using Chrome.",
         variant: "destructive",
       });
+      return;
+    }
+
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      
+      recognition.lang = 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        toast({
+          title: "Listening...",
+          description: "Speak now",
+        });
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
+        const newMessage = {
+          id: Date.now().toString(),
+          content: transcript,
+          sender: 'user',
+          timestamp: new Date(),
+        };
+        
+        messages.push(newMessage);
+        localStorage.setItem('chat-messages', JSON.stringify(messages));
+        navigate(0); // Refresh to show new message
+        
+        toast({
+          title: "Voice Input Received",
+          description: "Your message has been added to the chat.",
+        });
+      };
+
+      recognition.onerror = (event) => {
+        toast({
+          title: "Error",
+          description: "There was an error with voice recognition: " + event.error,
+          variant: "destructive",
+        });
+      };
+
+      recognition.start();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to start voice recognition",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleCameraInput = () => {
-    if ('mediaDevices' in navigator) {
-      toast({
-        title: "Camera Access",
-        description: "Camera support is available but not yet implemented. Coming soon!",
-      });
-    } else {
+  const handleCameraInput = async () => {
+    if (!('mediaDevices' in navigator)) {
       toast({
         title: "Camera Unavailable",
         description: "Your browser doesn't support camera access.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const videoElement = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      videoElement.srcObject = stream;
+      await videoElement.play();
+
+      // Set canvas size to match video dimensions
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+
+      // Capture frame from video
+      context?.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+      
+      // Convert to base64
+      const imageData = canvas.toDataURL('image/jpeg');
+
+      // Stop all video streams
+      stream.getTracks().forEach(track => track.stop());
+
+      // Add image to chat
+      const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
+      const newMessage = {
+        id: Date.now().toString(),
+        content: `<img src="${imageData}" alt="Captured image" class="max-w-full h-auto rounded-lg" />`,
+        sender: 'user',
+        timestamp: new Date(),
+      };
+      
+      messages.push(newMessage);
+      localStorage.setItem('chat-messages', JSON.stringify(messages));
+      navigate(0); // Refresh to show new message
+
+      toast({
+        title: "Image Captured",
+        description: "Your image has been added to the chat.",
+      });
+    } catch (error) {
+      toast({
+        title: "Camera Error",
+        description: "Failed to access camera: " + (error as Error).message,
         variant: "destructive",
       });
     }
