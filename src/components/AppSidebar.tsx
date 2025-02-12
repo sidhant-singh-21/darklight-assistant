@@ -1,3 +1,4 @@
+
 import { Mic, Camera, User, MessageSquare, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -58,8 +59,9 @@ export function AppSidebar() {
     }
 
     try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
+      // Use proper type casting with our new type definitions
+      const SpeechRecognitionAPI = (window.SpeechRecognition || window.webkitSpeechRecognition) as SpeechRecognitionConstructor;
+      const recognition = new SpeechRecognitionAPI();
       
       recognition.lang = 'en-US';
       recognition.continuous = false;
@@ -72,19 +74,19 @@ export function AppSidebar() {
         });
       };
 
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = event.results[0][0].transcript;
         const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
         const newMessage = {
           id: Date.now().toString(),
           content: transcript,
-          sender: 'user',
+          sender: 'user' as const,
           timestamp: new Date(),
         };
         
         messages.push(newMessage);
         localStorage.setItem('chat-messages', JSON.stringify(messages));
-        navigate(0); // Refresh to show new message
+        navigate(0);
         
         toast({
           title: "Voice Input Received",
@@ -92,7 +94,7 @@ export function AppSidebar() {
         });
       };
 
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: Event & { error: string }) => {
         toast({
           title: "Error",
           description: "There was an error with voice recognition: " + event.error,
@@ -129,31 +131,26 @@ export function AppSidebar() {
       videoElement.srcObject = stream;
       await videoElement.play();
 
-      // Set canvas size to match video dimensions
       canvas.width = videoElement.videoWidth;
       canvas.height = videoElement.videoHeight;
 
-      // Capture frame from video
       context?.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
       
-      // Convert to base64
       const imageData = canvas.toDataURL('image/jpeg');
 
-      // Stop all video streams
       stream.getTracks().forEach(track => track.stop());
 
-      // Add image to chat
       const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
       const newMessage = {
         id: Date.now().toString(),
         content: `<img src="${imageData}" alt="Captured image" class="max-w-full h-auto rounded-lg" />`,
-        sender: 'user',
+        sender: 'user' as const,
         timestamp: new Date(),
       };
       
       messages.push(newMessage);
       localStorage.setItem('chat-messages', JSON.stringify(messages));
-      navigate(0); // Refresh to show new message
+      navigate(0);
 
       toast({
         title: "Image Captured",
