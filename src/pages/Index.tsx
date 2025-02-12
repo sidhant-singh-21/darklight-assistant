@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Send } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
@@ -14,18 +14,20 @@ interface Message {
 }
 
 const Index = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const savedMessages = localStorage.getItem('chat-messages');
+    return savedMessages ? JSON.parse(savedMessages) : [{
       id: '1',
       content: "Hello! I'm your AI assistant. How can I help you today?",
       sender: 'ai',
       timestamp: new Date(),
-    }
-  ]);
+    }];
+  });
   const [inputMessage, setInputMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!inputMessage.trim()) {
@@ -37,6 +39,8 @@ const Index = () => {
       return;
     }
 
+    setIsProcessing(true);
+
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -45,17 +49,29 @@ const Index = () => {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    localStorage.setItem('chat-messages', JSON.stringify(newMessages));
 
-    // Simulate AI response
+    // Simulate AI response with more realistic messages
+    const aiResponses = [
+      "I understand your question. Let me help you with that.",
+      "That's an interesting point. Here's what I think...",
+      "Based on what you're asking, I would suggest...",
+      "I can help you with that. Here's my recommendation...",
+    ];
+
     setTimeout(() => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I received your message. This is a simulated response. In a real application, this would be connected to an AI service.",
+        content: aiResponses[Math.floor(Math.random() * aiResponses.length)],
         sender: 'ai',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, aiMessage]);
+      const updatedMessages = [...newMessages, aiMessage];
+      setMessages(updatedMessages);
+      localStorage.setItem('chat-messages', JSON.stringify(updatedMessages));
+      setIsProcessing(false);
     }, 1000);
 
     setInputMessage('');
@@ -72,6 +88,9 @@ const Index = () => {
             } max-w-[80%]`}
           >
             <p className="text-sm">{message.content}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              {new Date(message.timestamp).toLocaleTimeString()}
+            </p>
           </Card>
         ))}
       </div>
@@ -82,8 +101,9 @@ const Index = () => {
             className="flex-1"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
+            disabled={isProcessing}
           />
-          <Button type="submit">
+          <Button type="submit" disabled={isProcessing}>
             <Send className="w-4 h-4" />
           </Button>
         </form>

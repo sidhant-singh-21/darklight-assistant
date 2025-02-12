@@ -1,7 +1,7 @@
 
 import { Mic, Camera, User, MessageSquare, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import {
   Sidebar,
   SidebarContent,
@@ -20,38 +20,62 @@ export function AppSidebar() {
   const handleProfileClick = () => {
     toast({
       title: "Profile",
-      description: "Profile feature coming soon!",
+      description: "Profile feature coming soon! This will allow you to customize your AI assistant experience.",
     });
   };
 
   const handleSavedChatsClick = () => {
-    toast({
-      title: "Saved Chats",
-      description: "Saved chats feature coming soon!",
-    });
+    const savedChats = localStorage.getItem('chat-messages');
+    if (savedChats) {
+      toast({
+        title: "Saved Chats",
+        description: "Your chat history is automatically saved in your browser.",
+      });
+    } else {
+      toast({
+        title: "No Saved Chats",
+        description: "Start a conversation to automatically save your chat history.",
+      });
+    }
   };
 
   const handleResetChat = () => {
-    // In a real app, this would clear the chat state
+    localStorage.removeItem('chat-messages');
     toast({
       title: "Chat Reset",
-      description: "Chat has been reset.",
+      description: "Chat history has been cleared.",
     });
-    navigate(0); // Refresh the page for now
+    navigate(0);
   };
 
   const handleVoiceInput = () => {
-    toast({
-      title: "Voice Input",
-      description: "Voice input feature coming soon!",
-    });
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      toast({
+        title: "Voice Input",
+        description: "Speech recognition is available but not yet implemented. Coming soon!",
+      });
+    } else {
+      toast({
+        title: "Voice Input Unavailable",
+        description: "Your browser doesn't support voice input. Please try using Chrome.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCameraInput = () => {
-    toast({
-      title: "Camera Input",
-      description: "Camera input feature coming soon!",
-    });
+    if ('mediaDevices' in navigator) {
+      toast({
+        title: "Camera Access",
+        description: "Camera support is available but not yet implemented. Coming soon!",
+      });
+    } else {
+      toast({
+        title: "Camera Unavailable",
+        description: "Your browser doesn't support camera access.",
+        variant: "destructive",
+      });
+    }
   };
 
   const menuItems = [
