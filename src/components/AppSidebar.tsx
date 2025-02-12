@@ -59,39 +59,61 @@ export function AppSidebar() {
     }
 
     try {
-      // Use proper type casting with our new type definitions
       const SpeechRecognitionAPI = (window.SpeechRecognition || window.webkitSpeechRecognition) as SpeechRecognitionConstructor;
       const recognition = new SpeechRecognitionAPI();
       
       recognition.lang = 'en-US';
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      let currentMessageId: string | null = null;
 
       recognition.onstart = () => {
         toast({
           title: "Listening...",
           description: "Speak now",
         });
-      };
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = event.results[0][0].transcript;
+        
+        // Add an initial message for interim results
         const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
+        currentMessageId = Date.now().toString();
         const newMessage = {
-          id: Date.now().toString(),
-          content: transcript,
+          id: currentMessageId,
+          content: "Listening...",
           sender: 'user' as const,
           timestamp: new Date(),
         };
-        
         messages.push(newMessage);
         localStorage.setItem('chat-messages', JSON.stringify(messages));
         navigate(0);
-        
-        toast({
-          title: "Voice Input Received",
-          description: "Your message has been added to the chat.",
-        });
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('');
+
+        if (currentMessageId) {
+          // Update the existing message with new transcript
+          const updatedMessages = messages.map(message => 
+            message.id === currentMessageId
+              ? { ...message, content: transcript }
+              : message
+          );
+          localStorage.setItem('chat-messages', JSON.stringify(updatedMessages));
+          navigate(0);
+        }
+
+        // If this is the final result
+        if (event.results[event.results.length - 1].isFinal) {
+          currentMessageId = null;
+          recognition.stop();
+          toast({
+            title: "Voice Input Received",
+            description: "Your message has been added to the chat.",
+          });
+        }
       };
 
       recognition.onerror = (event: Event & { error: string }) => {
@@ -100,6 +122,17 @@ export function AppSidebar() {
           description: "There was an error with voice recognition: " + event.error,
           variant: "destructive",
         });
+        currentMessageId = null;
+        recognition.stop();
+      };
+
+      recognition.onend = () => {
+        if (currentMessageId) {
+          const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
+          const finalMessages = messages.filter(message => message.id !== currentMessageId);
+          localStorage.setItem('chat-messages', JSON.stringify(finalMessages));
+          navigate(0);
+        }
       };
 
       recognition.start();
