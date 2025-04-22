@@ -1,4 +1,3 @@
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -9,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index";
+import Profile from "./pages/Profile"; // ✅ Import Profile component
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +29,7 @@ const App = () => (
                 </div>
                 <Routes>
                   <Route path="/" element={<Index />} />
+                  <Route path="/profile" element={<Profile />} /> {/* ✅ Profile route */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>

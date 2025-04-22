@@ -1,5 +1,4 @@
-
-import { Mic, Camera, User, MessageSquare, RotateCcw } from "lucide-react";
+import { Mic, Camera, User, RotateCcw, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -13,34 +12,44 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
+// 🔁 Talk to your LLaMA 2 backend
+async function fetchLlamaResponse(prompt: string): Promise<string> {
+  try {
+    const response = await fetch("http://localhost:8000/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+    });
+
+    const data = await response.json();
+    return data.response || "🤖 (No reply from LLaMA)";
+  } catch (err) {
+    console.error("LLaMA API error:", err);
+    return "❌ Failed to get response from LLaMA.";
+  }
+}
+
 export function AppSidebar() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleProfileClick = () => {
+  const handleNewChat = () => {
+    localStorage.removeItem("chat-messages");
     toast({
-      title: "Profile",
-      description: "Profile feature coming soon! This will allow you to customize your AI assistant experience.",
+      title: "New Chat",
+      description: "Starting a new conversation.",
     });
+    navigate("/"); // ✅ Always go to the homepage (chat interface)
   };
 
-  const handleSavedChatsClick = () => {
-    const savedChats = localStorage.getItem('chat-messages');
-    if (savedChats) {
-      toast({
-        title: "Saved Chats",
-        description: "Your chat history is automatically saved in your browser.",
-      });
-    } else {
-      toast({
-        title: "No Saved Chats",
-        description: "Start a conversation to automatically save your chat history.",
-      });
-    }
+  const handleProfileClick = () => {
+    navigate("/profile");
   };
 
   const handleResetChat = () => {
-    localStorage.removeItem('chat-messages');
+    localStorage.removeItem("chat-messages");
     toast({
       title: "Chat Reset",
       description: "Chat history has been cleared.",
@@ -49,10 +58,10 @@ export function AppSidebar() {
   };
 
   const handleVoiceInput = async () => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
       toast({
         title: "Voice Input Unavailable",
-        description: "Your browser doesn't support voice input. Please try using Chrome.",
+        description: "Your browser doesn't support voice input. Please use Chrome or Edge.",
         variant: "destructive",
       });
       return;
@@ -61,92 +70,76 @@ export function AppSidebar() {
     try {
       const SpeechRecognitionAPI = (window.SpeechRecognition || window.webkitSpeechRecognition) as SpeechRecognitionConstructor;
       const recognition = new SpeechRecognitionAPI();
-      
-      recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = true;
 
-      let currentMessageId: string | null = null;
+      recognition.lang = "en-US";
+      recognition.continuous = false;
+      recognition.interimResults = false;
 
-      recognition.onstart = () => {
-        toast({
-          title: "Listening...",
-          description: "Speak now",
-        });
-        
-        // Add an initial message for interim results
-        const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
-        currentMessageId = Date.now().toString();
-        const newMessage = {
-          id: currentMessageId,
-          content: "Listening...",
-          sender: 'user' as const,
-          timestamp: new Date(),
-        };
-        messages.push(newMessage);
-        localStorage.setItem('chat-messages', JSON.stringify(messages));
-        navigate(0);
-      };
+      toast({
+        title: "🎙️ Listening...",
+        description: "Speak now...",
+      });
 
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
+      recognition.onresult = async (event: SpeechRecognitionEvent) => {
         const transcript = Array.from(event.results)
-          .map(result => result[0].transcript)
-          .join('');
+          .map((result) => result[0].transcript)
+          .join("")
+          .trim();
 
-        if (currentMessageId) {
-          // Update the existing message with new transcript
-          const updatedMessages = messages.map(message => 
-            message.id === currentMessageId
-              ? { ...message, content: transcript }
-              : message
-          );
-          localStorage.setItem('chat-messages', JSON.stringify(updatedMessages));
+        if (transcript) {
+          const messages = JSON.parse(localStorage.getItem("chat-messages") || "[]");
+
+          const userMessage = {
+            id: Date.now().toString(),
+            content: transcript,
+            sender: "user" as const,
+            timestamp: new Date().toISOString(),
+          };
+
+          messages.push(userMessage);
+          localStorage.setItem("chat-messages", JSON.stringify(messages));
           navigate(0);
-        }
 
-        // If this is the final result
-        if (event.results[event.results.length - 1].isFinal) {
-          currentMessageId = null;
-          recognition.stop();
+          const botReply = await fetchLlamaResponse(transcript);
+
+          const botMessage = {
+            id: (Date.now() + 1).toString(),
+            content: botReply,
+            sender: "bot" as const,
+            timestamp: new Date().toISOString(),
+          };
+
+          messages.push(botMessage);
+          localStorage.setItem("chat-messages", JSON.stringify(messages));
+          navigate(0);
+
           toast({
-            title: "Voice Input Received",
-            description: "Your message has been added to the chat.",
+            title: "🤖 LLaMA Replied",
+            description: "Check the chat window for the response.",
           });
         }
       };
 
-      recognition.onerror = (event: Event & { error: string }) => {
+      recognition.onerror = (event: any) => {
         toast({
-          title: "Error",
-          description: "There was an error with voice recognition: " + event.error,
+          title: "Speech Recognition Error",
+          description: event.error,
           variant: "destructive",
         });
-        currentMessageId = null;
-        recognition.stop();
-      };
-
-      recognition.onend = () => {
-        if (currentMessageId) {
-          const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
-          const finalMessages = messages.filter(message => message.id !== currentMessageId);
-          localStorage.setItem('chat-messages', JSON.stringify(finalMessages));
-          navigate(0);
-        }
       };
 
       recognition.start();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to start voice recognition",
+        description: "Something went wrong while starting voice input.",
         variant: "destructive",
       });
     }
   };
 
   const handleCameraInput = async () => {
-    if (!('mediaDevices' in navigator)) {
+    if (!("mediaDevices" in navigator)) {
       toast({
         title: "Camera Unavailable",
         description: "Your browser doesn't support camera access.",
@@ -157,36 +150,35 @@ export function AppSidebar() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const videoElement = document.createElement('video');
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      
+      const videoElement = document.createElement("video");
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
       videoElement.srcObject = stream;
       await videoElement.play();
 
       canvas.width = videoElement.videoWidth;
       canvas.height = videoElement.videoHeight;
-
       context?.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-      
-      const imageData = canvas.toDataURL('image/jpeg');
 
-      stream.getTracks().forEach(track => track.stop());
+      const imageData = canvas.toDataURL("image/jpeg");
+      stream.getTracks().forEach((track) => track.stop());
 
-      const messages = JSON.parse(localStorage.getItem('chat-messages') || '[]');
+      const messages = JSON.parse(localStorage.getItem("chat-messages") || "[]");
+
       const newMessage = {
         id: Date.now().toString(),
         content: `<img src="${imageData}" alt="Captured image" class="max-w-full h-auto rounded-lg" />`,
-        sender: 'user' as const,
-        timestamp: new Date(),
+        sender: "user" as const,
+        timestamp: new Date().toISOString(),
       };
-      
+
       messages.push(newMessage);
-      localStorage.setItem('chat-messages', JSON.stringify(messages));
+      localStorage.setItem("chat-messages", JSON.stringify(messages));
       navigate(0);
 
       toast({
-        title: "Image Captured",
+        title: "📸 Image Captured",
         description: "Your image has been added to the chat.",
       });
     } catch (error) {
@@ -199,8 +191,8 @@ export function AppSidebar() {
   };
 
   const menuItems = [
+    { title: "New Chat", icon: Plus, onClick: handleNewChat },
     { title: "Profile", icon: User, onClick: handleProfileClick },
-    { title: "Saved Chats", icon: MessageSquare, onClick: handleSavedChatsClick },
     { title: "Reset Chat", icon: RotateCcw, onClick: handleResetChat },
   ];
 
